@@ -1,0 +1,818 @@
+{
+  "schemaVersion": "1.0",
+  "project": {
+    "name": "PackForge4UEM",
+    "description": "Package lifecycle console for Omnissa Workspace ONE UEM and App Volumes",
+    "repository": "https://github.com/franekSoftSF/PackForge4UEM",
+    "license": "MIT",
+    "openSource": true,
+    "language": "en",
+    "note": "This file is the source of truth for project status. docs/status.md is generated from it and must not be edited by hand.",
+    "displayName": "PackForge for Omnissa Workspace ONE UEM",
+    "licenseFile": "LICENSE (already present in the repository)"
+  },
+  "schedule": {
+    "start": "2026-08-19",
+    "deadline": "2026-09-15",
+    "milestones": [
+      {
+        "id": "W1",
+        "title": "Foundation and contracts",
+        "from": "2026-08-19",
+        "to": "2026-08-25",
+        "state": "in-progress",
+        "goal": "Repo, solution, OpenAPI contract, domain model, Angular skeleton, CI, compose stack boots"
+      },
+      {
+        "id": "W2",
+        "title": "UEM integration and agent MVP",
+        "from": "2026-08-26",
+        "to": "2026-09-01",
+        "state": "todo",
+        "goal": "End-to-end publish of one package to one tenant; agent executes a build job"
+      },
+      {
+        "id": "W3",
+        "title": "Multi-tenant, versioning, App Volumes",
+        "from": "2026-09-02",
+        "to": "2026-09-08",
+        "state": "todo",
+        "goal": "Fan-out to N tenants, immutable versioning, App Volumes artifacts, job queue UI"
+      },
+      {
+        "id": "W4",
+        "title": "Hardening and launch",
+        "from": "2026-09-09",
+        "to": "2026-09-15",
+        "state": "todo",
+        "goal": "Security pass, docs, demo, publication content for Omnissa Community, blog and LinkedIn"
+      }
+    ]
+  },
+  "owners": {
+    "Codex": {
+      "scope": "Frontend - Angular 22 console, components, state, e2e tests"
+    },
+    "Cloud": {
+      "scope": "Backend - API, domain, persistence, UEM and App Volumes integrations, agent, CI"
+    }
+  },
+  "contract": {
+    "mechanism": "OpenAPI",
+    "note": "Generated from the backend, consumed by the console as a typed client. Frozen in W1 before parallel work starts. The only synchronisation point between the two tracks."
+  },
+  "overall": {
+    "state": "planning",
+    "tasksTotal": 48,
+    "tasksDone": 1,
+    "progressPercent": 2
+  },
+  "mvpScope": {
+    "included": [
+      "MSI packages",
+      "Windows internal applications in UEM",
+      "Freestyle Orchestrator workflow generation",
+      "App Volumes AppStack as a package artifact",
+      "App Volumes Agent as a managed prerequisite",
+      "Multi-tenant publish fan-out"
+    ],
+    "excluded": [
+      "MSIX",
+      "macOS packages",
+      "App Volumes capture VM automation",
+      "Package approval workflows",
+      "Role-based access control beyond a single admin role"
+    ]
+  },
+  "decisions": [
+    {
+      "id": "D01",
+      "date": "2026-08-19",
+      "decision": "NHibernate with FluentNHibernate for data access",
+      "rationale": "Explicit mapping control; consistent with other projects in this estate",
+      "status": "accepted"
+    },
+    {
+      "id": "D02",
+      "date": "2026-08-19",
+      "decision": "Versioned migrations via FluentMigrator, not NHibernate SchemaUpdate",
+      "rationale": "Community users will upgrade between releases and must keep their data",
+      "status": "accepted"
+    },
+    {
+      "id": "D03",
+      "date": "2026-08-19",
+      "decision": "SQLite stores metadata only; binaries live on an artifact volume, referenced by path plus SHA-256",
+      "rationale": "Multi-hundred-megabyte blobs in SQLite would wreck both the database and backups",
+      "status": "accepted"
+    },
+    {
+      "id": "D04",
+      "date": "2026-08-19",
+      "decision": "SQLite in WAL mode with writes serialised in the backend",
+      "rationale": "Prevents SQLITE_BUSY under concurrent multi-tenant fan-out; must be designed in from the start",
+      "status": "accepted"
+    },
+    {
+      "id": "D05",
+      "date": "2026-08-19",
+      "decision": "Kestrel serves the Angular static build and terminates TLS; no separate reverse proxy",
+      "rationale": "HAProxy cannot serve static files, so it would add a layer rather than replace one. One container and one config language lowers the barrier for contributors",
+      "status": "accepted",
+      "supersedes": "Earlier nginx assumption"
+    },
+    {
+      "id": "D06",
+      "date": "2026-08-19",
+      "decision": "Docker Compose is the unit of deployment; the agent stays outside Docker as a Windows service",
+      "rationale": "Backend stays portable and stateless; MSI work has to happen on Windows",
+      "status": "accepted"
+    },
+    {
+      "id": "D07",
+      "date": "2026-08-19",
+      "decision": "Agents authenticate with mTLS client certificates, private key in the Windows certificate store",
+      "rationale": "The agent can execute commands on the station and publish to production tenants, making it the most valuable component to compromise. Revocation is server-side",
+      "status": "accepted"
+    },
+    {
+      "id": "D08",
+      "date": "2026-08-19",
+      "decision": "MQTT carries notifications, progress and heartbeat/LWT; HTTPS carries job state and artifacts; a polling fallback is mandatory",
+      "rationale": "MQTT gives NAT-friendly push and free offline detection, but is not a durable job queue and cannot move large files. The broker must not become a single point of failure",
+      "status": "accepted"
+    },
+    {
+      "id": "D09",
+      "date": "2026-08-19",
+      "decision": "A JSON package manifest is the user-facing interface to automation; templates compose by inheritance",
+      "rationale": "Engineers describe intent instead of digging into the build engine; imperative steps remain as an escape hatch",
+      "status": "accepted"
+    },
+    {
+      "id": "D10",
+      "date": "2026-08-19",
+      "decision": "Workspace ONE Freestyle Orchestrator is the deployment engine; the console generates workflow JSON and does not build a competing DSL",
+      "rationale": "Install order, conditions and branching already execute natively in the platform. Removes an entire orchestration engine from scope",
+      "status": "accepted"
+    },
+    {
+      "id": "D11",
+      "date": "2026-08-19",
+      "decision": "App Volumes Agent is a separate managed prerequisite package enforced as the first conditional Freestyle step (variant A), not chained into every MSI (variant B)",
+      "rationale": "Variant B would duplicate a platform capability and produce N copies of the agent, with version conflicts and painful upgrades",
+      "status": "accepted"
+    },
+    {
+      "id": "D12",
+      "date": "2026-08-19",
+      "decision": "Manifests reference logical names; a resolver maps them to tenant-local IDs at publish time, and republishing updates the existing workflow idempotently",
+      "rationale": "Freestyle identifiers are tenant-local, so one workflow file cannot be copied across tenants. This is the core value of the product",
+      "status": "accepted"
+    },
+    {
+      "id": "D13",
+      "date": "2026-08-19",
+      "decision": "Work split - Codex owns frontend, Cloud owns backend, agent, integrations and CI; OpenAPI is the contract",
+      "rationale": "Enables parallel work with a single synchronisation point",
+      "status": "accepted"
+    },
+    {
+      "id": "D14",
+      "date": "2026-08-19",
+      "decision": "MVP is narrow: MSI plus Windows internal apps plus multi-tenant publish. MSIX, macOS and capture automation deferred to v0.2",
+      "rationale": "Four weeks to deadline; scope discipline is the only way the date holds",
+      "status": "accepted"
+    },
+    {
+      "id": "D15",
+      "date": "2026-08-19",
+      "decision": "status.json is the source of truth, status.md is generated from it",
+      "rationale": "Machine-readable state for tooling, readable view for humans, no divergence",
+      "status": "accepted"
+    },
+    {
+      "id": "D16",
+      "date": "2026-08-19",
+      "decision": "MIT license",
+      "rationale": "Chosen by the project owner; shortest and most permissive, maximises adoption",
+      "status": "accepted",
+      "resolves": "Q04"
+    },
+    {
+      "id": "D17",
+      "date": "2026-08-19",
+      "decision": "Repository is https://github.com/franekSoftSF/PackForge4UEM",
+      "rationale": "Created by the project owner",
+      "status": "accepted",
+      "resolves": "Q05"
+    },
+    {
+      "id": "D18",
+      "date": "2026-08-19",
+      "decision": "Project renamed to PackForge4UEM before any code was written",
+      "rationale": "Drops the word 'Manager', which collided with App Volumes Manager, an actual Omnissa server component, and removes the leading hyphen that command line tools parse as an option flag. Free to do while the repository is empty, expensive after publication",
+      "status": "accepted",
+      "resolves": "Q06, Q07"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "Q01",
+      "question": "Is a Workspace ONE UEM tenant with API access available for live verification?",
+      "impact": "Blocks schema verification for blob upload, internal application creation and Freestyle workflow import. Drives the E04 approach",
+      "assumedAnswer": "Not available - proceeding mock-first against documentation",
+      "blocking": [
+        "E04-T02",
+        "E04-T04"
+      ],
+      "timesAsked": 3,
+      "state": "open"
+    },
+    {
+      "id": "Q02",
+      "question": "Is a second UEM tenant available, so multi-tenant fan-out can be tested for real rather than simulated?",
+      "impact": "Verification depth of E06",
+      "state": "open"
+    },
+    {
+      "id": "Q03",
+      "question": "Is an App Volumes Manager instance with API access available?",
+      "impact": "Verification depth of E05",
+      "state": "open"
+    },
+    {
+      "id": "Q04",
+      "question": "Confirm the open source license",
+      "impact": "Required before publication",
+      "state": "resolved",
+      "resolvedBy": "D16",
+      "answer": "MIT"
+    },
+    {
+      "id": "Q05",
+      "question": "GitHub organisation and final repository URL",
+      "impact": "CI setup and README links",
+      "state": "resolved",
+      "resolvedBy": "D17",
+      "answer": "https://github.com/franekSoftSF/PackForge4UEM"
+    },
+    {
+      "id": "Q06",
+      "question": "Trademark review of the name - 'App Volumes Manager' is the name of an actual Omnissa server component, so PackForge4UEM may read as an official module",
+      "impact": "Naming risk before publication to Omnissa Community",
+      "state": "resolved",
+      "resolvedBy": "D18",
+      "answer": "Renamed to PackForge4UEM; the colliding word is gone"
+    },
+    {
+      "id": "Q07",
+      "question": "The repository name begins with a hyphen ('-PackForge4UEM'), which many command line tools parse as an option flag. Rename, or keep and document the workaround?",
+      "impact": "Affects clone instructions, CI configuration and scripts referencing the repository",
+      "state": "resolved",
+      "resolvedBy": "D18",
+      "answer": "Leading hyphen removed by the rename"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R01",
+      "risk": "The Freestyle Orchestrator workflow JSON schema and its import API surface are unverified. Historically Freestyle exposed less through the API than through the console",
+      "severity": "high",
+      "mitigation": "Mock-first development behind an interface; verify against a live tenant as soon as one exists; treat the generator as replaceable",
+      "relatedQuestion": "Q01"
+    },
+    {
+      "id": "R02",
+      "risk": "Four weeks to the deadline for three components and two external integrations",
+      "severity": "high",
+      "mitigation": "Narrow MVP (D14), OpenAPI contract frozen in W1 to unblock parallel work, launch content treated as a deliverable rather than an afterthought"
+    },
+    {
+      "id": "R03",
+      "risk": "SQLITE_BUSY under concurrent publish fan-out",
+      "severity": "medium",
+      "mitigation": "WAL mode plus serialised writes designed in from the start (D04); load test the fan-out path in W3"
+    },
+    {
+      "id": "R04",
+      "risk": "Large artifact uploads from the agent failing mid-transfer",
+      "severity": "medium",
+      "mitigation": "Chunked resumable upload with hash verification; a dropped connection must not discard a completed build"
+    },
+    {
+      "id": "R05",
+      "risk": "Credentials for multiple UEM tenants concentrated in one service",
+      "severity": "medium",
+      "mitigation": "Secrets encrypted at rest, never returned through the API, audit log on every use; mTLS for agents (D07)"
+    },
+    {
+      "id": "R06",
+      "risk": "Trademark confusion from the project name and from referencing Omnissa product names",
+      "severity": "low",
+      "mitigation": "Explicit non-affiliation disclaimer in the README; resolve Q06 before publication"
+    }
+  ],
+  "epics": [
+    {
+      "id": "E01",
+      "title": "Foundation and contracts",
+      "owner": "Cloud",
+      "milestone": "W1",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E01-T01",
+          "title": "Repository scaffold - solution (.slnx), directory layout, .gitignore, editorconfig (LICENSE already present)",
+          "state": "todo",
+          "dod": [
+            "Solution builds clean on a fresh clone"
+          ]
+        },
+        {
+          "id": "E01-T02",
+          "title": "Define the OpenAPI contract for packages, versions, tenants, jobs and publications",
+          "state": "todo",
+          "dod": [
+            "Contract reviewed with the frontend track",
+            "Typed client generates without errors"
+          ]
+        },
+        {
+          "id": "E01-T03",
+          "title": "CI pipeline - build, test, container image, OpenAPI artifact publication",
+          "state": "todo",
+          "dod": [
+            "Green pipeline on main",
+            "Client regeneration fails the build on contract drift"
+          ]
+        },
+        {
+          "id": "E01-T04",
+          "title": "Docker Compose skeleton - API container, volumes for database and artifacts",
+          "state": "todo",
+          "dod": [
+            "docker compose up serves a health endpoint over TLS"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E02",
+      "title": "Domain model and persistence",
+      "owner": "Cloud",
+      "milestone": "W1",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E02-T01",
+          "title": "Domain model - Package, PackageVersion, Artifact, Tenant, Job, Publication, AuditEntry",
+          "state": "todo",
+          "dod": [
+            "Versions immutable once built",
+            "App Volumes artifacts modelled from day one per D11"
+          ]
+        },
+        {
+          "id": "E02-T02",
+          "title": "NHibernate and FluentNHibernate mappings against SQLite, WAL mode, serialised writes",
+          "state": "todo",
+          "dod": [
+            "No array .Contains() in queries - it fails at runtime, not compile time",
+            "Every query executed against a live database, not only unit tested"
+          ]
+        },
+        {
+          "id": "E02-T03",
+          "title": "FluentMigrator baseline migration, applied on API startup",
+          "state": "todo",
+          "dod": [
+            "Upgrade from an empty database and from the previous version both verified"
+          ]
+        },
+        {
+          "id": "E02-T04",
+          "title": "Artifact store - SHA-256 addressed filesystem layout, retention and orphan cleanup",
+          "state": "todo",
+          "dod": [
+            "Hash mismatch rejects the artifact",
+            "Store survives container recreation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E03",
+      "title": "Package manifest and templates",
+      "owner": "Cloud",
+      "milestone": "W2",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E03-T01",
+          "title": "Manifest schema v1 plus published JSON Schema",
+          "state": "todo",
+          "dod": [
+            "An invalid manifest is rejected before a job starts, with a field-level message"
+          ]
+        },
+        {
+          "id": "E03-T02",
+          "title": "Template inheritance resolver - msi-repack, exe-wrap, appstack-only",
+          "state": "todo",
+          "dod": [
+            "A typical package manifest is under twenty lines",
+            "Imperative steps available as an escape hatch"
+          ]
+        },
+        {
+          "id": "E03-T03",
+          "title": "Manifest import and export, from file and from the console",
+          "state": "todo",
+          "dod": [
+            "Round trip preserves the manifest byte for byte",
+            "Raw manifest retained for provenance"
+          ]
+        },
+        {
+          "id": "E03-T04",
+          "title": "Reproducibility - manifest plus source hash determines the artifact",
+          "state": "todo",
+          "dod": [
+            "Rebuilding the same version produces an identical hash"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E04",
+      "title": "Workspace ONE UEM integration",
+      "owner": "Cloud",
+      "milestone": "W2",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E04-T01",
+          "title": "UEM client - OAuth 2.0 client credentials, retries, rate limit handling",
+          "state": "todo",
+          "dod": [
+            "Token refresh transparent to callers",
+            "Failures surfaced with the tenant that produced them"
+          ]
+        },
+        {
+          "id": "E04-T02",
+          "title": "Chunked blob upload and internal application creation",
+          "state": "todo",
+          "dod": [
+            "A multi-hundred-megabyte MSI uploads and appears in the tenant"
+          ],
+          "blockedBy": "Q01"
+        },
+        {
+          "id": "E04-T03",
+          "title": "Mock UEM server for development and integration tests",
+          "state": "todo",
+          "dod": [
+            "The full publish path is testable with no live tenant"
+          ]
+        },
+        {
+          "id": "E04-T04",
+          "title": "Freestyle workflow generator - manifest to workflow JSON, including the App Volumes Agent conditional first step",
+          "state": "todo",
+          "dod": [
+            "Generated workflow imports successfully",
+            "Install order and conditions verified on a device"
+          ],
+          "blockedBy": "Q01"
+        }
+      ]
+    },
+    {
+      "id": "E05",
+      "title": "App Volumes integration",
+      "owner": "Cloud",
+      "milestone": "W3",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E05-T01",
+          "title": "App Volumes Manager client - authentication and inventory of packages and AppStacks",
+          "state": "todo",
+          "dod": [
+            "Existing AppStacks listed and mapped to console packages"
+          ]
+        },
+        {
+          "id": "E05-T02",
+          "title": "AppStack registration and update from a package version",
+          "state": "todo",
+          "dod": [
+            "Every AppStack traceable back to the manifest version that produced it"
+          ]
+        },
+        {
+          "id": "E05-T03",
+          "title": "App Volumes Agent as a managed prerequisite package, with version floor enforcement",
+          "state": "todo",
+          "dod": [
+            "Agent absence detected and remediated as the first workflow step",
+            "One agent version managed centrally, not duplicated per package"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E06",
+      "title": "Multi-tenant publishing",
+      "owner": "Cloud",
+      "milestone": "W3",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E06-T01",
+          "title": "Tenant registry - environment URL, credentials in a secret store, organisation group, per-tenant assignment mapping",
+          "state": "todo",
+          "dod": [
+            "Secrets never returned through the API",
+            "Every credential use audited"
+          ]
+        },
+        {
+          "id": "E06-T02",
+          "title": "Logical name to tenant-local ID resolver for applications and smart groups",
+          "state": "todo",
+          "dod": [
+            "An unresolvable name fails the publication with a clear message, before any write to the tenant"
+          ]
+        },
+        {
+          "id": "E06-T03",
+          "title": "Publication fan-out - one version to N tenants, per-tenant state and log",
+          "state": "todo",
+          "dod": [
+            "Partial failure isolated to its tenant",
+            "A single tenant can be retried without republishing the rest"
+          ]
+        },
+        {
+          "id": "E06-T04",
+          "title": "Idempotent republish - update the existing workflow instead of cloning it",
+          "state": "todo",
+          "dod": [
+            "Ten publishes leave exactly one workflow per tenant",
+            "Console-managed workflows identifiable inside the tenant"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E07",
+      "title": "Agent wrapper",
+      "owner": "Cloud",
+      "milestone": "W2",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E07-T01",
+          "title": "Windows service host, installer, configuration and logging",
+          "state": "todo",
+          "dod": [
+            "Installs and self-recovers after a station reboot"
+          ]
+        },
+        {
+          "id": "E07-T02",
+          "title": "mTLS enrolment and authentication, private key held in the Windows certificate store",
+          "state": "todo",
+          "dod": [
+            "Revoking a certificate server-side locks the agent out immediately"
+          ]
+        },
+        {
+          "id": "E07-T03",
+          "title": "Job source behind an interface - MQTT push plus polling fallback",
+          "state": "todo",
+          "dod": [
+            "Agent keeps working with the broker down",
+            "An offline agent is detected via the MQTT last will"
+          ]
+        },
+        {
+          "id": "E07-T04",
+          "title": "Build execution - download and verify source, run template steps, produce and hash artifacts",
+          "state": "todo",
+          "dod": [
+            "Build output reproducible",
+            "Step-level progress visible in the console"
+          ]
+        },
+        {
+          "id": "E07-T05",
+          "title": "Chunked resumable artifact upload",
+          "state": "todo",
+          "dod": [
+            "An interrupted transfer resumes rather than restarting the build"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E08",
+      "title": "Console UI",
+      "owner": "Codex",
+      "milestone": "W2",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E08-T01",
+          "title": "Angular 22 application shell, routing, typed API client generated from OpenAPI",
+          "state": "todo",
+          "dod": [
+            "Client generated, not hand-written"
+          ]
+        },
+        {
+          "id": "E08-T02",
+          "title": "Package catalogue - list, detail, version history and diff between versions",
+          "state": "todo",
+          "dod": [
+            "Version provenance visible, including source hash and manifest"
+          ]
+        },
+        {
+          "id": "E08-T03",
+          "title": "Manifest editor with schema validation and template selection",
+          "state": "todo",
+          "dod": [
+            "Validation errors shown against fields before submission"
+          ]
+        },
+        {
+          "id": "E08-T04",
+          "title": "Job queue with live progress and log streaming",
+          "state": "todo",
+          "dod": [
+            "Build progress visible without a page refresh"
+          ]
+        },
+        {
+          "id": "E08-T05",
+          "title": "Tenant registry and publication matrix - one version across N tenants",
+          "state": "todo",
+          "dod": [
+            "Per-tenant state and single-tenant retry available from the UI"
+          ]
+        },
+        {
+          "id": "E08-T06",
+          "title": "Audit log view",
+          "state": "todo",
+          "dod": [
+            "Who published what, where and when, filterable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E09",
+      "title": "Security",
+      "owner": "Cloud",
+      "milestone": "W4",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E09-T01",
+          "title": "TLS termination in Kestrel with a mounted certificate, HSTS, modern cipher configuration",
+          "state": "todo",
+          "dod": [
+            "No plaintext listener exposed"
+          ]
+        },
+        {
+          "id": "E09-T02",
+          "title": "Administrator authentication for the console",
+          "state": "todo",
+          "dod": [
+            "No default credentials shipped"
+          ]
+        },
+        {
+          "id": "E09-T03",
+          "title": "Secret storage encrypted at rest, write-only through the API",
+          "state": "todo",
+          "dod": [
+            "Tenant credentials unreadable from the database alone"
+          ]
+        },
+        {
+          "id": "E09-T04",
+          "title": "Security review of the agent trust boundary and the upload path",
+          "state": "todo",
+          "dod": [
+            "Findings triaged before publication"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E10",
+      "title": "Packaging and deployment",
+      "owner": "Cloud",
+      "milestone": "W4",
+      "state": "todo",
+      "tasks": [
+        {
+          "id": "E10-T01",
+          "title": "Production Compose stack - API, optional MQTT broker profile, volumes, healthchecks",
+          "state": "todo",
+          "dod": [
+            "Clean clone to running console in a single command"
+          ]
+        },
+        {
+          "id": "E10-T02",
+          "title": "Large upload tuning - request limits and timeouts sized for multi-hundred-megabyte artifacts",
+          "state": "todo",
+          "dod": [
+            "A 1 GB artifact uploads without a limit error"
+          ]
+        },
+        {
+          "id": "E10-T03",
+          "title": "Backup and restore procedure for the database and artifact store",
+          "state": "todo",
+          "dod": [
+            "Restore verified on a clean host"
+          ]
+        },
+        {
+          "id": "E10-T04",
+          "title": "Release process - versioned container image, tagged release, upgrade notes",
+          "state": "todo",
+          "dod": [
+            "Upgrade from the previous release preserves packages"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E11",
+      "title": "Documentation and launch",
+      "owner": "Cloud + Codex",
+      "milestone": "W4",
+      "state": "in-progress",
+      "tasks": [
+        {
+          "id": "E11-T01",
+          "title": "README with problem statement, architecture diagram and manifest example",
+          "state": "done",
+          "dod": [
+            "Understandable to a reader who has never seen the project"
+          ]
+        },
+        {
+          "id": "E11-T02",
+          "title": "status.json and status.md, with a generator for the readable view",
+          "state": "in-progress",
+          "dod": [
+            "status.md never edited by hand"
+          ]
+        },
+        {
+          "id": "E11-T03",
+          "title": "Installation and first-package walkthrough",
+          "state": "todo",
+          "dod": [
+            "A new user publishes a package by following the document alone"
+          ]
+        },
+        {
+          "id": "E11-T04",
+          "title": "Manifest and template authoring reference",
+          "state": "todo",
+          "dod": [
+            "Community can contribute templates without reading the source"
+          ]
+        },
+        {
+          "id": "E11-T05",
+          "title": "Demo recording of the end-to-end flow",
+          "state": "todo",
+          "dod": [
+            "Shows one package reaching two tenants"
+          ]
+        },
+        {
+          "id": "E11-T06",
+          "title": "Launch content - Omnissa Community post, blog article, LinkedIn announcement",
+          "state": "todo",
+          "dod": [
+            "Published by 2026-09-15"
+          ]
+        }
+      ]
+    }
+  ]
+}
